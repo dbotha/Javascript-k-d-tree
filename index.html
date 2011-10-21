@@ -1,0 +1,112 @@
+<html>
+	<head>
+		<script src="kdtree.js"></script>
+		<script src="data/latlng.js"></script>
+		<script type="text/javascript">
+			
+			var NUM_NEAREST_TO_FIND = 30;
+			
+			var canvas;
+			var context;
+			var kdtree;
+			var points;
+			var scaleX, scaleY, minX, minY;
+			var previousNearestNeighbours = [];
+			var previousConsideredPoints = [];
+			
+			function init() {
+				window.addEventListener('mousemove', mousemove, true);
+				window.addEventListener('mouseup', mouseup, true);
+				
+				canvas  = document.getElementById("pointcanvas");
+				canvas.height = window.innerHeight * 2;
+				canvas.width  = 2 * canvas.height / 3;
+				context = canvas.getContext("2d");
+
+				var maxX = -Math.pow(2, 31); 
+				minX =  Math.pow(2, 31) - 1; 
+				var maxY = -Math.pow(2, 31); 
+				minY =  Math.pow(2, 31) - 1;
+				
+				points = latlng; // latlngs comes from data/latlng.js, this file contains a single huge object.
+				for (var i = 0; i < points.length; ++i) {
+					var coord = points[i];
+					var tmp = coord.x;
+					coord.x = coord.y;
+					coord.y = -tmp;
+					
+					maxX = Math.max(maxX, coord.x);
+					minX = Math.min(minX, coord.x);
+					maxY = Math.max(maxY, coord.y);
+					minY = Math.min(minY, coord.y);
+				}
+				
+				kdtree = new datastructure.KDTree(points);
+
+				var dx = maxX - minX;
+				var dy = maxY - minY;
+				scaleX = canvas.width / dx;
+				scaleY = canvas.height / dy;
+
+				drawAllPoints();
+				
+			}
+			
+			function drawAllPoints() {
+				context.clearRect(0, 0, canvas.width, canvas.height);
+				for (var i = 0; i < points.length; ++i) {
+					var p = points[i];
+					drawPoint(p, '#000000');
+				}
+			}
+			
+			function drawPoint(p, colour, radius) {
+				context.fillStyle = colour;
+				var x = Math.round((p.x - minX) * scaleX);
+				var y = Math.round((p.y - minY) * scaleY);
+				context.fillRect(x, y, 3, 3);
+			}
+			
+			function mousemove(event) {
+				var x = event.offsetX / scaleX + minX;
+				var y = event.offsetY / scaleY + minY;
+				
+				var consideredPoints = [];
+				var nearestNeighbours = kdtree.getNearestNeighbours({x: x, y: y}, NUM_NEAREST_TO_FIND, consideredPoints);
+				
+				// redraw previous nearest neighbours & previous considered nodes with the original black colour
+				for (var i = 0; i < previousConsideredPoints.length; ++i) {
+					var p = previousConsideredPoints[i];
+					drawPoint(p, '#000000', 1);
+				}
+				
+				for (var i = 0; i < previousNearestNeighbours.length; ++i) {
+					var p = previousNearestNeighbours[i];
+					drawPoint(p, '#000000', 1);
+				}
+				
+				// highlight all the nodes involved in the current search in different colours
+				for (var i = 0; i < consideredPoints.length; ++i) {
+					var p = consideredPoints[i];
+					drawPoint(p, '#FF0000', 1);
+				}
+				
+				for (var i = 0; i < nearestNeighbours.length; ++i) {
+					var p = nearestNeighbours[i];
+					drawPoint(p, '#00FF00', 1);
+				}
+				
+				previousConsideredPoints = consideredPoints;
+				previousNearestNeighbours = nearestNeighbours;
+			}
+			
+			function mouseup(event) {
+				alert('searched ' + previousConsideredPoints.length + ' of ' + points.length + ' points to find the nearest ' + NUM_NEAREST_TO_FIND + ' points');
+			}
+			
+		</script>
+	</head>
+	<body onload="init();">
+		<canvas id="pointcanvas" width="800" height="600" ></canvas>
+	</body>
+</html>
